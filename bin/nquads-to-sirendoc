@@ -27,7 +27,6 @@ processBySubject(processByObject);
 function processBySubject (callback) {
   var currentSubject,
       currentFolder,
-      outgoing,
       quads;
   var bySubject = spawn('sort', [source]);
   byline(bySubject.stdout).on('data', function (line) {
@@ -37,8 +36,11 @@ function processBySubject (callback) {
       if (quad.subject !== currentSubject) {
         // Write outgoing quads of previous triple,
         // since they are complete now
-        if (currentSubject)
+        if (currentSubject) {
           writeOutgoing(quads, currentFolder);
+          // also create an empty incoming file
+          writeIncoming([], currentFolder);
+        }
 
         // Start new entity
         currentSubject = quad.subject;
@@ -49,11 +51,39 @@ function processBySubject (callback) {
       // Add the quad to the list of outgoing relations
       quads.push(quad);
     }
-  }).on('end', callback);
+  }).on('end', callback || function () {});
 }
 
 // Write all quad's ingoing triples
 function processByObject (callback) {
+  var currentObject,
+      currentFolder,
+      folderId = -1,
+      folderSubject = '',
+      quads;
+  var byObject = spawn('sort', ['-k3', source]);
+  byline(byObject.stdout).on('data', function (line) {
+    var quad = parseQuad(line);
+    if (quad) {
+      // Start a new entity if the object is different
+      if (quad.object !== currentObject) {
+        // Write incoming quads of previous triple,
+        // since they are complete now
+        if (folderSubject && currentObject === folderSubject)
+          writeIncoming(quads, currentFolder);
+
+        // Start new entity
+        currentObject = quad.object;
+        // Find the folder that belongs to the entity
+        while (folderSubject !== undefined && folderSubject < currentObject)
+          folderSubject = getMetadataSubject(getFolderName(++folderId));
+        currentFolder = getFolderName(folderId);
+        quads = [];
+      }
+      // Add the quad to the list of incoming relations
+      quads.push(quad);
+    }
+  }).on('end', callback || function () {});
 }
 
 // Create a folder for a quad
@@ -95,10 +125,20 @@ function writeMetadata(quad, currentFolder) {
 
 // Write the quads as outgoing triples
 function writeOutgoing(quads, currentFolder) {
+  writeAsTriples(quads, currentFolder + 'outgoing-triples.nt');
+}
+
+// Write the quads as incoming triples
+function writeIncoming(quads, currentFolder) {
+  writeAsTriples(quads, currentFolder + 'incoming-triples.nt');
+}
+
+// Write the quads as triples
+function writeAsTriples(quads, file) {
   var triples = '';
   for (var i = 0; i < quads.length; i++)
     triples += quads[i].subject + ' ' + quads[i].predicate + ' ' + quads[i].object + ' .\n';
-  fs.writeFileSync(currentFolder + 'outgoing-triples.nt', triples);
+  fs.writeFileSync(file, triples);
 }
 
 // Parse a quad into components
@@ -111,6 +151,15 @@ function parseQuad(line) {
                object:    match[3],
                context:   match[4],
              };
+  }
+}
+
+// Get the entity subject from the metadata
+function getMetadataSubject(folder) {
+  var metadataFile = folder + 'metadata';
+  if (fs.existsSync(metadataFile)) {
+    var metadata = fs.readFileSync(metadataFile, 'utf8');
+    return metadata.split('\n')[1];
   }
 }
 
