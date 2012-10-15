@@ -22,18 +22,30 @@ if(!fs.existsSync(source))
   error(source, 'does not exist');
 mkdirp.sync(destination);
 
-// Write all quad's metadata and outgoing triples
-var currentSubject = '',
-    currentFolder = '';
+// Write all quads' metadata and outgoing triples
+var currentSubject,
+    currentFolder,
+    outgoing,
+    quads;
 var bySubject = spawn('sort', [source]);
-byline(bySubject.stdout).on('data', function (line) {
+var quadStream = byline(bySubject.stdout).on('data', function (line) {
   var quad = parseQuad(line);
   if (quad) {
+    // Start a new entity if the subject is different
     if (quad.subject !== currentSubject) {
+      // Write outgoing quads of previous triple,
+      // since they are complete now
+      if (currentSubject)
+        writeOutgoing(quads, currentFolder);
+
+      // Start new entity
       currentSubject = quad.subject;
       currentFolder = createFolder();
       writeMetadata(quad, currentFolder);
+      quads = [];
     }
+    // Add the quad to the list of outgoing relations
+    quads.push(quad);
   }
 });
 
@@ -68,6 +80,14 @@ function createFolder() {
 function writeMetadata(quad, currentFolder) {
   fs.writeFileSync(currentFolder + 'metadata',
                    quad.context + '\n' + quad.subject);
+}
+
+// Write the quads as outgoing triples
+function writeOutgoing(quads, currentFolder) {
+  var triples = '';
+  for (var i = 0; i < quads.length; i++)
+    triples += quads[i].subject + ' ' + quads[i].predicate + ' ' + quads[i].object + ' .\n';
+  fs.writeFileSync(currentFolder + 'outgoing-triples.nt', triples);
 }
 
 // Parse a quad into components
