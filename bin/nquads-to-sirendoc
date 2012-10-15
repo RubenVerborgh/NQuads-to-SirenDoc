@@ -27,7 +27,9 @@ processBySubject(processByObject);
 function processBySubject (callback) {
   var currentSubject,
       currentFolder,
+      lineCount = 0,
       quads;
+  print('Writing metadata and outgoing triples...');
   var bySubject = spawn('sort', [source]);
   byline(bySubject.stdout).on('data', function (line) {
     var quad = parseQuad(line);
@@ -51,6 +53,9 @@ function processBySubject (callback) {
       // Add the quad to the list of outgoing relations
       quads.push(quad);
     }
+    // Print status
+    if(++lineCount % 10000 === 0)
+      print('  ' + lineCount + ' lines processed');
   }).on('end', callback || function () {});
 }
 
@@ -60,7 +65,9 @@ function processByObject (callback) {
       currentFolder,
       folderId = -1,
       folderSubject = '',
+      lineCount = 0,
       quads;
+  print('Writing incoming triples...');
   var byObject = spawn('sort', ['-k3', source]);
   byline(byObject.stdout).on('data', function (line) {
     var quad = parseQuad(line);
@@ -83,6 +90,9 @@ function processByObject (callback) {
       // Add the quad to the list of incoming relations
       quads.push(quad);
     }
+    // Print status
+    if(++lineCount % 10000 === 0)
+      print('  ' + lineCount + ' lines processed');
   }).on('end', callback || function () {});
 }
 
