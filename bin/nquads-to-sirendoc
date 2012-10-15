@@ -3,7 +3,6 @@
 var fs = require('fs'),
     path = require('path'),
     spawn = require('child_process').spawn,
-    async = require('async'),
     mkdirp = require('mkdirp'),
     byline = require('byline'),
     print = console.log;
@@ -22,32 +21,40 @@ if(!fs.existsSync(source))
   error(source, 'does not exist');
 mkdirp.sync(destination);
 
-// Write all quads' metadata and outgoing triples
-var currentSubject,
-    currentFolder,
-    outgoing,
-    quads;
-var bySubject = spawn('sort', [source]);
-var quadStream = byline(bySubject.stdout).on('data', function (line) {
-  var quad = parseQuad(line);
-  if (quad) {
-    // Start a new entity if the subject is different
-    if (quad.subject !== currentSubject) {
-      // Write outgoing quads of previous triple,
-      // since they are complete now
-      if (currentSubject)
-        writeOutgoing(quads, currentFolder);
+processBySubject(processByObject);
 
-      // Start new entity
-      currentSubject = quad.subject;
-      currentFolder = createFolder();
-      writeMetadata(quad, currentFolder);
-      quads = [];
+// Write all quads' metadata and outgoing triples
+function processBySubject (callback) {
+  var currentSubject,
+      currentFolder,
+      outgoing,
+      quads;
+  var bySubject = spawn('sort', [source]);
+  byline(bySubject.stdout).on('data', function (line) {
+    var quad = parseQuad(line);
+    if (quad) {
+      // Start a new entity if the subject is different
+      if (quad.subject !== currentSubject) {
+        // Write outgoing quads of previous triple,
+        // since they are complete now
+        if (currentSubject)
+          writeOutgoing(quads, currentFolder);
+
+        // Start new entity
+        currentSubject = quad.subject;
+        currentFolder = createFolder();
+        writeMetadata(quad, currentFolder);
+        quads = [];
+      }
+      // Add the quad to the list of outgoing relations
+      quads.push(quad);
     }
-    // Add the quad to the list of outgoing relations
-    quads.push(quad);
-  }
-});
+  }).on('end', callback);
+}
+
+// Write all quad's ingoing triples
+function processByObject (callback) {
+}
 
 // Create a folder for a quad
 var entityCount = 0,
