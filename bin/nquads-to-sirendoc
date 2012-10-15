@@ -1,0 +1,90 @@
+#!/usr/bin/env node
+
+var fs = require('fs'),
+    path = require('path'),
+    spawn = require('child_process').spawn,
+    async = require('async'),
+    mkdirp = require('mkdirp'),
+    byline = require('byline'),
+    print = console.log;
+
+var regComment = /^\s*#/,
+    quad = /^\s*([^ ]+)\s+([^ ]+)\s+([^ ]+)\s+([^ ]+)\s*\.\s*$/;
+
+if (process.argv.length != 4)
+  error('usage:', path.basename(process.argv[1]),
+                  '<nquad source> <destination>');
+
+// Set up source and destination
+var source = process.argv[2],
+    destination = process.argv[3];
+if(!fs.existsSync(source))
+  error(source, 'does not exist');
+mkdirp.sync(destination);
+
+// Write all quad's metadata and outgoing triples
+var currentSubject = '',
+    currentFolder = '';
+var bySubject = spawn('sort', [source]);
+byline(bySubject.stdout).on('data', function (line) {
+  var quad = parseQuad(line);
+  if (quad) {
+    if (quad.subject !== currentSubject) {
+      currentSubject = quad.subject;
+      currentFolder = createFolder();
+      writeMetadata(quad, currentFolder);
+    }
+  }
+});
+
+// Create a folder for a quad
+var entityCount = 0,
+    maxFolderEntities = 1000,
+    idLength = 5;
+function createFolder() {
+  var docId = Math.floor(entityCount / maxFolderEntities).toString(),
+      entityId = (entityCount % maxFolderEntities).toString(),
+      folder = destination;
+
+  // zero-padded document ID
+  folder += '/docID';
+  for(var i = docId.length; i < idLength; i++)
+    folder += '0';
+  folder += docId;
+
+  // zero-padded entity ID
+  folder += '/entityId';
+  for(var i = entityId.length; i < idLength; i++)
+    folder += '0'
+  folder += entityId;
+
+  // create folder
+  mkdirp.sync(folder);
+  entityCount++;
+  return folder + '/';
+}
+
+// Write metadata file for a quad
+function writeMetadata(quad, currentFolder) {
+  fs.writeFileSync(currentFolder + 'metadata',
+                   quad.context + '\n' + quad.subject);
+}
+
+// Parse a quad into components
+function parseQuad(line) {
+  if (!line.match(regComment)) {
+    var match = line.match(quad);
+    if (match)
+      return { subject:   match[1],
+               predicate: match[2],
+               object:    match[3],
+               context:   match[4],
+             };
+  }
+}
+
+// Terminate with an error message
+function error() {
+  print.apply(this, arguments);
+  process.exit(1);
+}
