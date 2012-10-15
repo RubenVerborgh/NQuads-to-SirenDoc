@@ -63,7 +63,7 @@ function processBySubject (callback) {
 function processByObject (callback) {
   var currentObject,
       currentFolder,
-      folderId = -1,
+      folderId = 0,
       folderSubject = '',
       lineCount = 0,
       quads;
@@ -101,7 +101,7 @@ var entityCount = 0,
     maxFolderEntities = 1000,
     idLength = 5;
 function createFolder() {
-  var folder = getFolderName(entityCount++);
+  var folder = getFolderName(++entityCount);
   mkdirp.sync(folder);
   return folder;
 }
