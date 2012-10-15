@@ -61,8 +61,15 @@ var entityCount = 0,
     maxFolderEntities = 1000,
     idLength = 5;
 function createFolder() {
-  var docId = Math.floor(entityCount / maxFolderEntities).toString(),
-      entityId = (entityCount % maxFolderEntities).toString(),
+  var folder = getFolderName(entityCount++);
+  mkdirp.sync(folder);
+  return folder;
+}
+
+// Get the folder name based on the entity number
+function getFolderName(entityNumber) {
+  var docId = Math.floor(entityNumber / maxFolderEntities).toString(),
+      entityId = (entityNumber % maxFolderEntities).toString(),
       folder = destination;
 
   // zero-padded document ID
@@ -77,9 +84,6 @@ function createFolder() {
     folder += '0'
   folder += entityId;
 
-  // create folder
-  mkdirp.sync(folder);
-  entityCount++;
   return folder + '/';
 }
 
