@@ -150,7 +150,7 @@ function archive(archiveId, callback) {
 
   // Start archiving
   print('Creating archive ' + archiveId);
-  var tar = spawn('tar', ['-I', indexFile, '-czf',
+  var tar = spawn('tar', ['-T', indexFile, '-czf',
                           '../DE-' + withLeadingZeros(archiveId, 5) + '.tar.gz'],
                   { cwd: folder });
 
