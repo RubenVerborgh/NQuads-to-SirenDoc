@@ -119,7 +119,7 @@ function getFolderName(entityNumber) {
   folder += docId;
 
   // zero-padded entity ID
-  folder += '/entityId';
+  folder += '/entityID';
   for(var i = entityId.length; i < idLength; i++)
     folder += '0'
   folder += entityId;
