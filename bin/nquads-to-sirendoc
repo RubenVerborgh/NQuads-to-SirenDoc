@@ -10,8 +10,6 @@ var fs = require('fs'),
 var regComment = /^\s*#/,
     quad = /^\s*([^ ]+)\s+([^ ]+)\s+([^ ]+)\s+([^ ]+)\s*\.\s*$/;
 
-var processIncomingLinks = false;
-
 if (process.argv.length != 4)
   error('usage:', path.basename(process.argv[1]),
                   '<nquad source> <destination>');
@@ -23,10 +21,7 @@ if(!fs.existsSync(source))
   error(source, 'does not exist');
 mkdirp.sync(destination);
 
-processBySubject(function () {
-  if (processIncomingLinks)
-    processByObject();
-});
+processBySubject();
 
 // Write all quads' metadata and outgoing triples
 function processBySubject (callback) {
@@ -56,43 +51,6 @@ function processBySubject (callback) {
         quads = [];
       }
       // Add the quad to the list of outgoing relations
-      quads.push(quad);
-    }
-    // Print status
-    if(++lineCount % 10000 === 0)
-      print('  ' + lineCount + ' lines processed');
-  }).on('end', callback || function () {});
-}
-
-// Write all quad's ingoing triples
-function processByObject (callback) {
-  var currentObject,
-      currentFolder,
-      folderId = 0,
-      folderSubject = '',
-      lineCount = 0,
-      quads;
-  print('Writing incoming triples...');
-  var byObject = spawn('sort', ['-k3', source]);
-  byline(byObject.stdout).on('data', function (line) {
-    var quad = parseQuad(line);
-    if (quad) {
-      // Start a new entity if the object is different
-      if (quad.object !== currentObject) {
-        // Write incoming quads of previous triple,
-        // since they are complete now
-        if (folderSubject && currentObject === folderSubject)
-          writeIncoming(quads, currentFolder);
-
-        // Start new entity
-        currentObject = quad.object;
-        // Find the folder that belongs to the entity
-        while (folderSubject !== undefined && folderSubject < currentObject)
-          folderSubject = getMetadataSubject(getFolderName(++folderId));
-        currentFolder = getFolderName(folderId);
-        quads = [];
-      }
-      // Add the quad to the list of incoming relations
       quads.push(quad);
     }
     // Print status
@@ -135,8 +93,7 @@ function getFolderName(entityNumber) {
 // Write metadata file for a quad
 function writeMetadata(quad, currentFolder) {
   fs.writeFileSync(currentFolder + 'metadata',
-                   (processIncomingLinks ? quad.context : quad.subject)
-                   + '\n' + quad.subject);
+                   quad.subject + '\n' + quad.subject);
 }
 
 // Write the quads as outgoing triples
