@@ -9,6 +9,7 @@ var fs = require('fs'),
 
 var regComment = /^\s*#/,
     quad = /^\s*([^ ]+)\s+([^ ]+)\s+([^ ]+)\s+([^ ]+)\s*\.\s*$/;
+var noop = function () {};
 
 if (process.argv.length != 4)
   error('usage:', path.basename(process.argv[1]),
@@ -27,11 +28,12 @@ processBySubject();
 function processBySubject (callback) {
   var currentSubject,
       currentFolder,
-      lineCount = 0,
+      archiveCount = 1,
+      entityCount = 0,
       quads;
   print('Writing metadata and outgoing triples...');
   var bySubject = spawn('sort', [source]);
-  byline(bySubject.stdout).on('data', function (line) {
+  var quadStream = byline(bySubject.stdout).on('data', function (line) {
     var quad = parseQuad(line);
     if (quad) {
       // Start a new entity if the subject is different
@@ -44,50 +46,52 @@ function processBySubject (callback) {
           writeIncoming([], currentFolder);
         }
 
+        // Generate partial archive when sufficiently large
+        if (entityCount >= 50000) {
+          // Pause while archiving
+          quadStream.pause();
+          archive(archiveCount, function () { quadStream.resume(); });
+
+          // Start entity number from zero in new archive
+          entityCount = 0;
+          archiveCount++;
+        }
+
         // Start new entity
         currentSubject = quad.subject;
-        currentFolder = createFolder();
+        currentFolder = createFolder(archiveCount, ++entityCount);
         writeMetadata(quad, currentFolder);
         quads = [];
       }
       // Add the quad to the list of outgoing relations
       quads.push(quad);
     }
-    // Print status
-    if(++lineCount % 10000 === 0)
-      print('  ' + lineCount + ' lines processed');
-  }).on('end', callback || function () {});
+  }).on('end', function () {
+    if (entityCount)
+      archive(archiveCount++);
+    if (callback)
+      callback();
+  });
 }
 
 // Create a folder for a quad
-var entityCount = 0,
-    maxFolderEntities = 1,
-    idLength = 5;
-function createFolder() {
-  var folder = getFolderName(++entityCount);
+function createFolder(archiveId, entityNumber) {
+  var folder = getFolderName(archiveId, entityNumber);
   mkdirp.sync(folder);
   return folder;
 }
 
 // Get the folder name based on the entity number
-function getFolderName(entityNumber) {
+var maxFolderEntities = 1,
+    idLength = 5;
+function getFolderName(archiveId, entityNumber) {
   var docId = Math.floor(entityNumber / maxFolderEntities).toString(),
-      entityId = (entityNumber % maxFolderEntities).toString(),
-      folder = destination;
+      entityId = (entityNumber % maxFolderEntities).toString();
 
-  // zero-padded document ID
-  folder += '/docID';
-  for(var i = docId.length; i < idLength; i++)
-    folder += '0';
-  folder += docId;
-
-  // zero-padded entity ID
-  folder += '/entityID';
-  for(var i = entityId.length; i < idLength; i++)
-    folder += '0'
-  folder += entityId;
-
-  return folder + '/';
+  return destination + '/tmp' + archiveId
+                     + '/docID' + withLeadingZeros(docId, idLength)
+                     + '/entityID' + withLeadingZeros(entityId, idLength)
+                     + '/';
 }
 
 // Write metadata file for a quad
@@ -136,8 +140,43 @@ function getMetadataSubject(folder) {
   }
 }
 
+// Archive a group of document folders
+function archive(archiveId, callback) {
+  // Find documents to archive
+  var folder = destination + '/tmp' + archiveId,
+      indexFile = folder + '/index.txt',
+      docs = fs.readdirSync(folder);
+  fs.writeFileSync(indexFile, docs.join('\n'));
+
+  // Start archiving
+  print('Creating archive ' + archiveId);
+  var tar = spawn('tar', ['-I', indexFile, '-czf',
+                          '../DE-' + withLeadingZeros(archiveId, 5) + '.tar.gz'],
+                  { cwd: folder });
+
+  // Report errors
+  tar.stderr.setEncoding('utf8');
+  tar.stderr.on('data', function (data) {
+    error('Creating archive of ' + folder + ' failed: ' + data);
+  });
+
+  // Delete folder after completion
+  tar.on('exit', function () {
+    spawn('rm', ['-rf', folder]).on('exit', callback || noop);
+  });
+}
+
+// Returns a number of the specified total length, padded with leading zeros
+function withLeadingZeros(number, length) {
+  number = '' + number;
+  length -= number.length;
+  while (length--)
+    number = '0' + number
+  return number;
+}
+
 // Terminate with an error message
 function error() {
-  print.apply(this, arguments);
+  console.error.apply(this, arguments);
   process.exit(1);
 }
