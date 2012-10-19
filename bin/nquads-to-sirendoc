@@ -151,10 +151,20 @@ function getMetadataSubject(folder) {
 // Archive a group of document folders
 function archive(archiveId, callback) {
   // Find documents to archive
-  var folder = destination + '/tmp' + archiveId,
+  var folder = destination + '/tmp' + archiveId + '/',
       indexFile = folder + '/index.txt',
-      docs = fs.readdirSync(folder);
-  fs.writeFileSync(indexFile, docs.join('\n'));
+      index = [];
+
+  // Generate index
+  fs.readdirSync(folder).sort().forEach(function (doc) {
+    fs.readdirSync(folder + doc).sort().forEach(function (entity) {
+      var entityFolder = doc + '/' + entity + '/';
+      index.push(entityFolder + 'metadata',
+                 entityFolder + 'outgoing-triples.nt',
+                 entityFolder + 'incoming-triples.nt');
+    });
+  });
+  fs.writeFileSync(indexFile, index.join('\n'));
 
   // Start archiving
   print('Creating archive ' + archiveId);
