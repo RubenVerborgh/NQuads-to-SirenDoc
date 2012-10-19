@@ -70,8 +70,13 @@ function processBySubject (callback) {
       quads.push(quad);
     }
   }).on('end', function () {
-    if (entityCount)
+    if (entityCount) {
+      // Write last entity
+      writeOutgoing(quads, currentFolder);
+      writeIncoming([], currentFolder);
+      // Create last archive
       archive(archiveCount++);
+    }
     if (callback)
       callback();
   });
