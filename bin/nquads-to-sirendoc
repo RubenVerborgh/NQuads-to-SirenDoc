@@ -15,14 +15,17 @@ if (process.argv.length != 4)
   error('usage:', path.basename(process.argv[1]),
                   '<nquad source> <destination>');
 
-// Set up source and destination
-var source = process.argv[2],
-    destination = process.argv[3];
+// Set up source
+var source = process.argv[2];
 if(!fs.existsSync(source))
   error(source, 'does not exist');
-mkdirp.sync(destination);
 
-processBySubject();
+// Clear destination folder and start document creation
+var destination = process.argv[3];
+spawn('rm', ['-rf', destination]).on('exit', function () {
+  mkdirp.sync(destination);
+  processBySubject();
+});
 
 // Write all quads' metadata and outgoing triples
 function processBySubject (callback) {
