@@ -7,7 +7,7 @@ var fs = require('fs'),
     byline = require('byline'),
     print = console.log;
 
-var regQuad = /^\s*(<[^>]+>)\s+(<[^>]+>)\s+(<[^>]+>|".*")\s+(<[^>]+>)\s*\.\s*$/;
+var regQuad = /^\s*(<[^>]+>)\s+(<[^>]+>)\s+(<[^>]+>|".*"(?:@[^ ]+|\^\^<[^>]+>)?)\s+(<[^>]+>)\s*\.\s*$/;
 var noop = function () {};
 
 if (process.argv.length != 4)
