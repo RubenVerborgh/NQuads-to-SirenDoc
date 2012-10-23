@@ -34,7 +34,7 @@ function processBySubject (callback) {
       entityCount = 0,
       quads;
   print('Writing metadata and outgoing triples...');
-  var bySubject = spawn('sort', [source]);
+  var bySubject = spawn('sort', [source], { env: { LC_ALL: 'C' });
   var quadStream = byline(bySubject.stdout).on('data', function (line) {
     var quad = parseQuad(line);
     if (quad) {
