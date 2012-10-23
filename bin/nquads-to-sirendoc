@@ -7,8 +7,7 @@ var fs = require('fs'),
     byline = require('byline'),
     print = console.log;
 
-var regComment = /^\s*#/,
-    quad = /^\s*([^ ]+)\s+([^ ]+)\s+([^ ]+)\s+([^ ]+)\s*\.\s*$/;
+var regQuad = /^\s*(<[^>]+>)\s+(<[^>]+>)\s+(<[^>]+>|".*")\s+(<[^>]+>)\s*\.\s*$/;
 var noop = function () {};
 
 if (process.argv.length != 4)
@@ -128,15 +127,12 @@ function writeAsTriples(quads, file) {
 
 // Parse a quad into components
 function parseQuad(line) {
-  if (!line.match(regComment)) {
-    var match = line.match(quad);
-    if (match)
-      return { subject:   match[1],
-               predicate: match[2],
-               object:    match[3],
-               context:   match[4],
-             };
-  }
+  var match = line.match(regQuad);
+  return match && { subject:   match[1],
+                    predicate: match[2],
+                    object:    match[3],
+                    context:   match[4],
+                  };
 }
 
 // Get the entity subject from the metadata
